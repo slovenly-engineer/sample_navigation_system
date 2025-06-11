@@ -6,6 +6,7 @@
 - [機能](#機能)
 - [前提条件](#前提条件)
 - [インストール](#インストール)
+- [アーキテクチャ](#アーキテクチャ)
 - [クイックスタート](#クイックスタート)
 - [コアコンポーネント](#コアコンポーネント)
 - [使用例](#使用例)
@@ -18,15 +19,21 @@
 
 ## 概要
 
-このドキュメントでは、GoRouterとRiverpodを使用したFlutterアプリケーション向けの型安全で保守しやすいナビゲーションシステムの実装方法を説明します。このシステムは、自動的なBuildContext検証とHot Reload対応を備えた一元的なナビゲーション管理を提供します。
+このドキュメントでは、GoRouterとRiverpodを使用したFlutterアプリケーション向けの型安全で保守しやすいナビゲーションシステムの実装方法を説明します。Sealed Classと`routeData`プロパティを使用することで、完全な型安全性とコンパイル時のエラー検出を実現します。
+
+### 主な特徴
+
+本実装では、Sealed Class（`AppRoute`）を使用してすべてのルートを定義し、各ルートクラスが`routeData`プロパティで対応する`GoRouteData`インスタンスを返すことで、型安全で網羅的なナビゲーションシステムを構築します。go_router_builderによる自動コード生成と組み合わせることで、パラメータの型安全性も保証されます。
 
 ## 機能
 
-- ✅ **型安全性**: go_router_builderによる完全な型安全なナビゲーション
-- ✅ **シンプルさ**: GoRouteDataを直接使用する直感的なAPI
+- ✅ **完全な型安全性**: Sealed Classによる網羅的なルート定義とコンパイル時エラー検出
+- ✅ **明示的な紐付け**: 各AppRouteクラスが対応するGoRouteDataを明示的に指定
+- ✅ **統一API**: NavigationServiceによる一貫したナビゲーションインターフェース
 - ✅ **安全性**: 自動的なBuildContext検証とHot Reload対応
 - ✅ **一元管理**: すべてのナビゲーションとダイアログ操作の統一インターフェース
-- ✅ **保守性**: Riverpodによる依存性管理と簡単なテスト
+- ✅ **保守性**: Riverpodによる依存性管理とIDEでの追跡が容易
+- ✅ **拡張性**: 新しいルート追加時はコンパイルエラーで気づける
 
 ## 前提条件
 
@@ -64,40 +71,193 @@ flutter pub get
 dart run build_runner build
 ```
 
+## アーキテクチャ
+
+### システム構成図
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Widget Layer                          │
+│  ConsumerWidget ─────uses────> NavigationService        │
+└─────────────────────────────────────────────────────────┘
+                              │
+                              │ uses
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│                 Navigation Layer                         │
+│  NavigationService ─────uses────> AppRoute (Sealed)     │
+│         │                              │                 │
+│         │                              │ extends         │
+│         │                              ▼                 │
+│         │                    Home, Profile, Settings...  │
+│         │                              │                 │
+│         │                              │ routeData       │
+│         │                              ▼                 │
+│         └──────uses──────> GoRouteData + Generated Code │
+└─────────────────────────────────────────────────────────┘
+                              │
+                              │ uses
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│                    GoRouter Layer                        │
+│              GoRouter (from go_router)                   │
+└─────────────────────────────────────────────────────────┘
+```
+
 ## クイックスタート
 
-### 1. ルート定義
+### 1. Sealed Classによるルート定義
+
+```dart
+// lib/routes/app_route.dart
+import 'package:go_router/go_router.dart';
+import 'app_routes.dart';
+import '../models/models.dart';
+
+/// アプリケーションの全ルートを定義するSealed Class
+sealed class AppRoute {
+  const AppRoute();
+  
+  /// 対応するGoRouteDataインスタンスを返す
+  GoRouteData get routeData;
+}
+
+// ===== 各ルートの実装 =====
+
+class Home extends AppRoute {
+  const Home();
+  
+  @override
+  GoRouteData get routeData => const HomeRoute();
+}
+
+class Profile extends AppRoute {
+  const Profile();
+  
+  @override
+  GoRouteData get routeData => const ProfileRoute();
+}
+
+class Settings extends AppRoute {
+  final SettingsTab? initialTab;
+  
+  const Settings({this.initialTab});
+  
+  @override
+  GoRouteData get routeData => SettingsRoute(tab: initialTab?.name);
+}
+
+class User extends AppRoute {
+  final String userId;
+  
+  const User({required this.userId});
+  
+  @override
+  GoRouteData get routeData => UserRoute(userId: userId);
+}
+
+class Product extends AppRoute {
+  final String productId;
+  final ProductModel? initialData;
+  
+  const Product({
+    required this.productId,
+    this.initialData,
+  });
+  
+  @override
+  GoRouteData get routeData => ProductRoute(
+    productId: productId,
+    $extra: initialData,
+  );
+}
+```
+
+### 2. go_router_builderのルート定義
 
 ```dart
 // lib/routes/app_routes.dart
 import 'package:go_router/go_router.dart';
 import 'package:go_router_builder/go_router_builder.dart';
 import 'package:flutter/material.dart';
+import '../screens/screens.dart';
+import '../models/models.dart';
 
 part 'app_routes.g.dart';
 
 @TypedGoRoute<HomeRoute>(path: '/')
-class HomeRoute extends GoRouteData {
+class HomeRoute extends GoRouteData with _$HomeRoute {
   const HomeRoute();
   
   @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return const HomePage();
-  }
+  Widget build(BuildContext context, GoRouterState state) => const HomePage();
 }
 
 @TypedGoRoute<ProfileRoute>(path: '/profile')
-class ProfileRoute extends GoRouteData {
+class ProfileRoute extends GoRouteData with _$ProfileRoute {
   const ProfileRoute();
   
   @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return const ProfilePage();
-  }
+  Widget build(BuildContext context, GoRouterState state) => const ProfilePage();
+}
+
+@TypedGoRoute<SettingsRoute>(path: '/settings')
+class SettingsRoute extends GoRouteData with _$SettingsRoute {
+  final String? tab;
+  
+  const SettingsRoute({this.tab});
+  
+  @override
+  Widget build(BuildContext context, GoRouterState state) => 
+    SettingsPage(initialTab: tab != null ? SettingsTab.values.byName(tab!) : null);
+}
+
+@TypedGoRoute<UserRoute>(
+  path: '/user/:userId',
+  routes: [
+    TypedGoRoute<UserProfileRoute>(path: 'profile'),
+  ],
+)
+class UserRoute extends GoRouteData with _$UserRoute {
+  final String userId;
+  
+  const UserRoute({required this.userId});
+  
+  @override
+  Widget build(BuildContext context, GoRouterState state) => 
+    UserPage(userId: userId);
+}
+
+class UserProfileRoute extends GoRouteData with _$UserProfileRoute {
+  final String userId;
+  
+  const UserProfileRoute({required this.userId});
+  
+  @override
+  Widget build(BuildContext context, GoRouterState state) => 
+    UserProfilePage(userId: userId);
+}
+
+@TypedGoRoute<ProductRoute>(path: '/product/:productId')
+class ProductRoute extends GoRouteData with _$ProductRoute {
+  final String productId;
+  final ProductModel? $extra;
+  
+  const ProductRoute({
+    required this.productId,
+    this.$extra,
+  });
+  
+  @override
+  Widget build(BuildContext context, GoRouterState state) => 
+    ProductPage(
+      productId: productId,
+      initialData: $extra,
+    );
 }
 ```
 
-### 2. プロバイダーの設定
+### 3. プロバイダーの設定
 
 ```dart
 // lib/providers/router_provider.dart
@@ -115,25 +275,80 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 });
 ```
 
-### 3. NavigationServiceの追加
+### 4. NavigationServiceの実装
 
 ```dart
 // lib/services/navigation_service.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../routes/app_route.dart';
+import '../providers/router_provider.dart';
 
 class NavigationService {
   final Ref ref;
   
   NavigationService(this.ref);
   
-  // 基本的な使用例のため簡略化
   GoRouter get _router => ref.read(goRouterProvider);
+  BuildContext? get _context => _router.routerDelegate.navigatorKey.currentContext;
   
-  Future<bool> go<T extends GoRouteData>(T routeData) async {
-    // 実装は後述の完全版を参照
-    return true;
+  /// 画面遷移（go）
+  Future<bool> go(AppRoute route) async {
+    final context = _context;
+    if (context == null || !context.mounted) return false;
+    
+    try {
+      switch (route) {
+        case Home():
+          route.routeData.go(context);
+        case Profile():
+          route.routeData.go(context);
+        case Settings():
+          route.routeData.go(context);
+        case User():
+          route.routeData.go(context);
+        case UserProfile():
+          route.routeData.go(context);
+        case Product():
+          route.routeData.go(context);
+        // 他のルートも同様に追加
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      return false;
+    }
+  }
+  
+  /// 画面プッシュ
+  Future<T?> push<T extends Object?>(AppRoute route) async {
+    final context = _context;
+    if (context == null || !context.mounted) return null;
+    
+    try {
+      return switch (route) {
+        Home() => route.routeData.push<T>(context),
+        Profile() => route.routeData.push<T>(context),
+        Settings() => route.routeData.push<T>(context),
+        User() => route.routeData.push<T>(context),
+        UserProfile() => route.routeData.push<T>(context),
+        Product() => route.routeData.push<T>(context),
+        // 他のルートも同様に追加
+      };
+    } catch (e) {
+      debugPrint('Push error: $e');
+      return null;
+    }
+  }
+  
+  /// 戻る
+  bool pop<T>([T? result]) {
+    if (_router.canPop()) {
+      _context?.pop(result);
+      return true;
+    }
+    return false;
   }
 }
 
@@ -142,7 +357,7 @@ final navigationServiceProvider = Provider<NavigationService>((ref) {
 });
 ```
 
-### 4. メインアプリの設定
+### 5. メインアプリの設定
 
 ```dart
 // lib/main.dart
@@ -182,101 +397,138 @@ class MyApp extends ConsumerWidget {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../routes/app_route.dart';
+import '../providers/router_provider.dart';
 
 class NavigationService {
   final Ref ref;
   
   NavigationService(this.ref);
   
-  /// 最新のGoRouterインスタンスを取得（Hot Reload対応）
   GoRouter get _router => ref.read(goRouterProvider);
-  
-  /// 現在のBuildContextを取得
   BuildContext? get _context => _router.routerDelegate.navigatorKey.currentContext;
   
-  /// Context待機処理（Hot Reload対応）
-  Future<BuildContext?> _waitForContext() async {
-    var context = _context;
-    if (_isValid(context)) return context;
-    
-    // Hot Reload直後はContextがnullになるため短時間待機
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    context = _context;
-    return _isValid(context) ? context : null;
-  }
-  
-  /// Contextの有効性チェック
-  bool _isValid(BuildContext? context) => context != null && context.mounted;
-  
-  /// 安全な非同期実行ラッパー
-  Future<T> _run<T>(Future<T> Function(BuildContext) action, T fallback) async {
-    final context = await _waitForContext();
-    if (!_isValid(context)) return fallback;
-    
-    try {
-      return await action(context!);
-    } catch (e) {
-      debugPrint('Navigation error: $e');
-      return fallback;
-    }
-  }
-  
-  // === ナビゲーションメソッド ===
-  
-  /// 画面遷移（スタック置き換え）
-  /// 戻り値: true=成功, false=失敗
-  Future<bool> go<T extends GoRouteData>(T routeData) => 
-    _run((ctx) async { routeData.go(ctx); return true; }, false);
-  
-  /// 画面プッシュ（スタック追加）
-  /// 戻り値: 画面からの戻り値, null=失敗・キャンセル
-  Future<T?> push<T extends Object?, R extends GoRouteData>(R routeData) => 
-    _run((ctx) => routeData.push<T>(ctx), null);
-  
-  /// 画面置き換え
-  /// 戻り値: 画面からの戻り値, null=失敗
-  Future<T?> pushReplacement<T extends Object?, R extends GoRouteData>(
-    R routeData, {Object? result}
-  ) => _run((ctx) => routeData.pushReplacement<T>(ctx, result), null);
-  
-  /// 現在画面をポップ
-  /// 戻り値: true=成功, false=失敗・ポップ不可
-  bool pop<T extends Object?>([T? result]) {
+  /// 画面遷移（go）
+  Future<bool> go(AppRoute route) async {
     final context = _context;
-    if (!_isValid(context) || !_router.canPop()) return false;
+    if (context == null || !context.mounted) return false;
     
     try {
-      _router.pop(result);
+      switch (route) {
+        case Home():
+          route.routeData.go(context);
+        case Profile():
+          route.routeData.go(context);
+        case Settings():
+          route.routeData.go(context);
+        case User():
+          route.routeData.go(context);
+        case UserProfile():
+          route.routeData.go(context);
+        case UserPosts():
+          route.routeData.go(context);
+        case PostDetail():
+          route.routeData.go(context);
+        case Product():
+          route.routeData.go(context);
+        case Checkout():
+          route.routeData.go(context);
+      }
       return true;
     } catch (e) {
-      debugPrint('Pop error: $e');
+      debugPrint('Navigation error: $e');
       return false;
     }
   }
   
-  /// ポップ可能かチェック
+  /// 画面プッシュ
+  Future<T?> push<T extends Object?>(AppRoute route) async {
+    final context = _context;
+    if (context == null || !context.mounted) return null;
+    
+    try {
+      return switch (route) {
+        Home() => route.routeData.push<T>(context),
+        Profile() => route.routeData.push<T>(context),
+        Settings() => route.routeData.push<T>(context),
+        User() => route.routeData.push<T>(context),
+        UserProfile() => route.routeData.push<T>(context),
+        UserPosts() => route.routeData.push<T>(context),
+        PostDetail() => route.routeData.push<T>(context),
+        Product() => route.routeData.push<T>(context),
+        Checkout() => route.routeData.push<T>(context),
+      };
+    } catch (e) {
+      debugPrint('Push error: $e');
+      return null;
+    }
+  }
+  
+  /// 画面置き換え
+  Future<void> pushReplacement(AppRoute route) async {
+    final context = _context;
+    if (context == null || !context.mounted) return;
+    
+    try {
+      switch (route) {
+        case Home():
+          route.routeData.pushReplacement(context);
+        case Profile():
+          route.routeData.pushReplacement(context);
+        case Settings():
+          route.routeData.pushReplacement(context);
+        case User():
+          route.routeData.pushReplacement(context);
+        case UserProfile():
+          route.routeData.pushReplacement(context);
+        case UserPosts():
+          route.routeData.pushReplacement(context);
+        case PostDetail():
+          route.routeData.pushReplacement(context);
+        case Product():
+          route.routeData.pushReplacement(context);
+        case Checkout():
+          route.routeData.pushReplacement(context);
+      }
+    } catch (e) {
+      debugPrint('Push replacement error: $e');
+    }
+  }
+  
+  /// 戻る
+  bool pop<T>([T? result]) {
+    if (_router.canPop()) {
+      _context?.pop(result);
+      return true;
+    }
+    return false;
+  }
+  
+  /// 戻れるかチェック
   bool canPop() => _router.canPop();
   
   // === ダイアログ・モーダル系メソッド ===
   
-  /// 汎用ダイアログ表示
-  /// 戻り値: ダイアログからの戻り値, null=失敗・キャンセル
-  Future<T?> showDialog<T>({required Widget dialog, bool barrierDismissible = true}) => 
-    _run((ctx) => showDialog<T>(
-      context: ctx, 
-      barrierDismissible: barrierDismissible, 
-      builder: (_) => dialog
-    ), null);
+  Future<T?> showDialogWidget<T>({
+    required Widget dialog,
+    bool barrierDismissible = true,
+  }) async {
+    final context = _context;
+    if (context == null || !context.mounted) return null;
+    
+    return showDialog<T>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      builder: (_) => dialog,
+    );
+  }
   
-  /// アラートダイアログ表示
-  /// 戻り値: true=OK押下, false=失敗
   Future<bool> showAlert({
     required String title,
     required String message,
     String buttonText = 'OK',
   }) async {
-    final result = await showDialog<bool>(
+    final result = await showDialogWidget<bool>(
       dialog: AlertDialog(
         title: Text(title),
         content: Text(message),
@@ -291,15 +543,13 @@ class NavigationService {
     return result ?? false;
   }
   
-  /// 確認ダイアログ表示
-  /// 戻り値: true=確認, false=キャンセル, null=失敗
   Future<bool?> showConfirmDialog({
     required String title,
     required String message,
     String confirmText = '確認',
     String cancelText = 'キャンセル',
   }) async {
-    return await showDialog<bool>(
+    return showDialogWidget<bool>(
       dialog: AlertDialog(
         title: Text(title),
         content: Text(message),
@@ -317,33 +567,37 @@ class NavigationService {
     );
   }
   
-  /// ボトムシート表示
-  /// 戻り値: シートからの戻り値, null=失敗・キャンセル
   Future<T?> showBottomSheet<T>({
     required Widget content,
     bool isScrollControlled = false,
-  }) => _run((ctx) => showModalBottomSheet<T>(
-      context: ctx,
+  }) async {
+    final context = _context;
+    if (context == null || !context.mounted) return null;
+    
+    return showModalBottomSheet<T>(
+      context: context,
       isScrollControlled: isScrollControlled,
       builder: (_) => content,
-    ), null);
+    );
+  }
   
-  /// スナックバー表示
-  /// 戻り値: true=表示成功, false=失敗
   Future<bool> showSnackBar({
-    required String message, 
-    Duration? duration, 
-    SnackBarAction? action
-  }) => _run((ctx) async {
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text(message), 
-          duration: duration ?? Duration(seconds: 3), 
-          action: action
-        )
-      );
-      return true;
-    }, false);
+    required String message,
+    Duration? duration,
+    SnackBarAction? action,
+  }) async {
+    final context = _context;
+    if (context == null || !context.mounted) return false;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: duration ?? const Duration(seconds: 3),
+        action: action,
+      ),
+    );
+    return true;
+  }
 }
 
 final navigationServiceProvider = Provider<NavigationService>((ref) {
@@ -354,79 +608,92 @@ final navigationServiceProvider = Provider<NavigationService>((ref) {
 ### ルート定義の詳細例
 
 ```dart
-// lib/routes/app_routes.dart
+// lib/routes/app_route.dart
 import 'package:go_router/go_router.dart';
-import 'package:go_router_builder/go_router_builder.dart';
-import 'package:flutter/material.dart';
+import 'app_routes.dart';
+import '../models/models.dart';
 
-part 'app_routes.g.dart';
-
-// ホーム画面
-@TypedGoRoute<HomeRoute>(path: '/')
-class HomeRoute extends GoRouteData {
-  const HomeRoute();
-  
-  @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return const HomePage();
-  }
+/// Sealed Classによるルート定義
+sealed class AppRoute {
+  const AppRoute();
+  GoRouteData get routeData;
 }
 
-// パラメータ付き詳細画面
-@TypedGoRoute<DetailRoute>(path: '/detail/:id')
-class DetailRoute extends GoRouteData {
-  final String id;
-  final String? tab; // クエリパラメータ
-  
-  const DetailRoute({required this.id, this.tab});
+// シンプルなルート
+class Home extends AppRoute {
+  const Home();
   
   @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return DetailPage(id: id, initialTab: tab);
-  }
+  GoRouteData get routeData => const HomeRoute();
 }
 
-// extraデータ付き設定画面
-@TypedGoRoute<SettingsRoute>(path: '/settings')
-class SettingsRoute extends GoRouteData {
-  final SettingsData? $extra;
+// パラメータ付きルート
+class Settings extends AppRoute {
+  final SettingsTab? initialTab;
   
-  const SettingsRoute({this.$extra});
+  const Settings({this.initialTab});
   
   @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return SettingsPage(initialData: $extra);
-  }
+  GoRouteData get routeData => SettingsRoute(tab: initialTab?.name);
 }
 
-// ネストしたルート例
-@TypedGoRoute<UserRoute>(
-  path: '/user/:userId',
-  routes: [
-    TypedGoRoute<UserProfileRoute>(path: '/profile'),
-    TypedGoRoute<UserSettingsRoute>(path: '/settings'),
-  ],
-)
-class UserRoute extends GoRouteData {
+// 複数パラメータとクエリパラメータ
+class PostDetail extends AppRoute {
   final String userId;
+  final String postId;
+  final bool showComments;
   
-  const UserRoute({required this.userId});
+  const PostDetail({
+    required this.userId,
+    required this.postId,
+    this.showComments = false,
+  });
   
   @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return UserPage(userId: userId);
-  }
+  GoRouteData get routeData => PostDetailRoute(
+    userId: userId,
+    postId: postId,
+    showComments: showComments,
+  );
 }
 
-class UserProfileRoute extends GoRouteData {
-  final String userId;
+// オブジェクトを渡すルート
+class Product extends AppRoute {
+  final String productId;
+  final ProductModel? initialData;
   
-  const UserProfileRoute({required this.userId});
+  const Product({
+    required this.productId,
+    this.initialData,
+  });
   
   @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return UserProfilePage(userId: userId);
-  }
+  GoRouteData get routeData => ProductRoute(
+    productId: productId,
+    $extra: initialData,
+  );
+}
+
+// 複雑なデータ構造を渡すルート
+class Checkout extends AppRoute {
+  final List<CartItem> items;
+  final ShippingAddress address;
+  final PaymentMethod paymentMethod;
+  
+  const Checkout({
+    required this.items,
+    required this.address,
+    required this.paymentMethod,
+  });
+  
+  @override
+  GoRouteData get routeData => CheckoutRoute(
+    $extra: CheckoutData(
+      items: items,
+      address: address,
+      paymentMethod: paymentMethod,
+    ),
+  );
 }
 ```
 
@@ -435,59 +702,127 @@ class UserProfileRoute extends GoRouteData {
 ### Widget内での基本的な使用方法
 
 ```dart
-// lib/screens/home_page.dart
+// lib/screens/example_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/navigation_service.dart';
-import '../routes/app_routes.dart';
+import '../routes/app_route.dart';
 
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+class ExamplePage extends ConsumerWidget {
+  const ExamplePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final nav = ref.read(navigationServiceProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 基本的なナビゲーション
-            ElevatedButton(
-              onPressed: () => nav.go(const ProfileRoute()),
-              child: const Text('プロフィールへ'),
+      appBar: AppBar(title: const Text('Navigation Example')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // シンプルなナビゲーション
+          ElevatedButton(
+            onPressed: () => nav.go(const Home()),
+            child: const Text('ホーム'),
+          ),
+          
+          ElevatedButton(
+            onPressed: () => nav.go(const Profile()),
+            child: const Text('プロフィール'),
+          ),
+          
+          // パラメータ付きナビゲーション
+          ElevatedButton(
+            onPressed: () => nav.go(
+              const Settings(initialTab: SettingsTab.notifications),
             ),
-            
-            // パラメータ付きナビゲーション
-            ElevatedButton(
-              onPressed: () => nav.go(const DetailRoute(id: '123', tab: 'info')),
-              child: const Text('詳細画面へ'),
+            child: const Text('設定（通知タブ）'),
+          ),
+          
+          ElevatedButton(
+            onPressed: () => nav.go(
+              const User(userId: '123'),
             ),
-            
-            // プッシュナビゲーション
-            ElevatedButton(
-              onPressed: () => nav.push(const ProfileRoute()),
-              child: const Text('プロフィールをプッシュ'),
+            child: const Text('ユーザー詳細'),
+          ),
+          
+          // ネストしたルート
+          ElevatedButton(
+            onPressed: () => nav.go(
+              const UserProfile(userId: '123'),
             ),
-            
-            // 確認ダイアログ
-            ElevatedButton(
-              onPressed: () async {
-                final confirmed = await nav.showConfirmDialog(
-                  title: '確認',
-                  message: '実行しますか？',
+            child: const Text('ユーザープロフィール'),
+          ),
+          
+          // 複数パラメータ
+          ElevatedButton(
+            onPressed: () => nav.go(
+              const PostDetail(
+                userId: '123',
+                postId: '456',
+                showComments: true,
+              ),
+            ),
+            child: const Text('投稿詳細（コメント表示）'),
+          ),
+          
+          // オブジェクトを渡す
+          ElevatedButton(
+            onPressed: () async {
+              final product = await fetchProduct('789');
+              nav.go(Product(
+                productId: product.id,
+                initialData: product,
+              ));
+            },
+            child: const Text('商品詳細（データ付き）'),
+          ),
+          
+          // 複雑なデータ構造
+          ElevatedButton(
+            onPressed: () => nav.go(
+              Checkout(
+                items: cartItems,
+                address: selectedAddress,
+                paymentMethod: selectedPayment,
+              ),
+            ),
+            child: const Text('チェックアウト'),
+          ),
+          
+          const Divider(),
+          
+          // プッシュナビゲーション
+          ElevatedButton(
+            onPressed: () async {
+              final result = await nav.push<ProductModel>(
+                const Product(productId: '123'),
+              );
+              if (result != null) {
+                nav.showSnackBar(
+                  message: '選択された商品: ${result.name}',
                 );
-                
-                if (confirmed == true) {
-                  nav.showSnackBar(message: '実行しました');
-                }
-              },
-              child: const Text('確認ダイアログ'),
-            ),
-          ],
-        ),
+              }
+            },
+            child: const Text('商品選択（結果を受け取る）'),
+          ),
+          
+          // 確認ダイアログ
+          ElevatedButton(
+            onPressed: () async {
+              final confirmed = await nav.showConfirmDialog(
+                title: '確認',
+                message: '本当に削除しますか？',
+                confirmText: '削除',
+              );
+              
+              if (confirmed == true) {
+                nav.showSnackBar(message: '削除しました');
+              }
+            },
+            child: const Text('確認ダイアログ'),
+          ),
+        ],
       ),
     );
   }
@@ -500,12 +835,13 @@ class HomePage extends ConsumerWidget {
 // lib/controllers/user_controller.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/navigation_service.dart';
-import '../routes/app_routes.dart';
+import '../routes/app_route.dart';
 
 class UserController extends StateNotifier<AsyncValue<User?>> {
   final NavigationService _nav;
+  final AuthService _authService;
   
-  UserController(this._nav) : super(const AsyncValue.loading());
+  UserController(this._nav, this._authService) : super(const AsyncValue.loading());
   
   /// ユーザーログイン
   Future<void> loginUser(String email, String password) async {
@@ -516,7 +852,7 @@ class UserController extends StateNotifier<AsyncValue<User?>> {
       state = AsyncValue.data(user);
       
       // ログイン成功時の画面遷移
-      final success = await _nav.go(const HomeRoute());
+      final success = await _nav.go(const Home());
       if (success) {
         _nav.showSnackBar(message: 'ログインしました');
       }
@@ -533,7 +869,9 @@ class UserController extends StateNotifier<AsyncValue<User?>> {
   
   /// プロフィール編集
   Future<void> editProfile() async {
-    final result = await _nav.push<ProfileEditResult>(const ProfileEditRoute());
+    final result = await _nav.push<ProfileEditResult>(
+      const ProfileEdit()
+    );
     
     if (result != null) {
       _nav.showSnackBar(message: 'プロフィールを更新しました');
@@ -552,14 +890,15 @@ class UserController extends StateNotifier<AsyncValue<User?>> {
     if (confirmed == true) {
       await _authService.logout();
       state = const AsyncValue.data(null);
-      await _nav.go(const LoginRoute());
+      await _nav.go(const Login());
     }
   }
 }
 
 final userControllerProvider = StateNotifierProvider<UserController, AsyncValue<User?>>((ref) {
   final nav = ref.read(navigationServiceProvider);
-  return UserController(nav);
+  final auth = ref.read(authServiceProvider);
+  return UserController(nav, auth);
 });
 ```
 
@@ -569,17 +908,21 @@ final userControllerProvider = StateNotifierProvider<UserController, AsyncValue<
 
 ```dart
 // lib/services/conditional_navigation_service.dart
+import '../routes/app_route.dart';
+import '../services/navigation_service.dart';
+
 class ConditionalNavigationService {
   final NavigationService _nav;
+  final PermissionService _permissionService;
   
-  ConditionalNavigationService(this._nav);
+  ConditionalNavigationService(this._nav, this._permissionService);
   
   /// ユーザーロールに応じた画面遷移
   Future<void> navigateByUserRole(UserRole role) async {
-    final route = switch (role) {
-      UserRole.admin => const AdminDashboardRoute(),
-      UserRole.moderator => const ModeratorDashboardRoute(),
-      UserRole.user => const UserDashboardRoute(),
+    final AppRoute route = switch (role) {
+      UserRole.admin => const AdminDashboard(),
+      UserRole.moderator => const ModeratorDashboard(),
+      UserRole.user => const UserDashboard(),
     };
     
     final success = await _nav.go(route);
@@ -594,7 +937,7 @@ class ConditionalNavigationService {
   
   /// 権限チェック付きナビゲーション
   Future<void> navigateWithPermissionCheck(
-    GoRouteData route,
+    AppRoute route,
     String requiredPermission,
   ) async {
     final hasPermission = await _permissionService.checkPermission(requiredPermission);
@@ -615,6 +958,9 @@ class ConditionalNavigationService {
 
 ```dart
 // lib/services/onboarding_flow_service.dart
+import '../routes/app_route.dart';
+import '../services/navigation_service.dart';
+
 class OnboardingFlowService {
   final NavigationService _nav;
   
@@ -623,27 +969,69 @@ class OnboardingFlowService {
   /// オンボーディングフロー実行
   Future<void> startOnboardingFlow() async {
     // Step 1: ウェルカム画面
-    final shouldContinue = await _nav.push<bool>(const WelcomeRoute());
+    final shouldContinue = await _nav.push<bool>(const Welcome());
     if (shouldContinue != true) return;
     
     // Step 2: プロフィール設定
-    final profile = await _nav.push<UserProfile>(const ProfileSetupRoute());
+    final profile = await _nav.push<UserProfile>(const ProfileSetup());
     if (profile == null) return;
     
     // Step 3: 通知設定
     final notificationSettings = await _nav.push<NotificationSettings>(
-      const NotificationSetupRoute()
+      const NotificationSetup()
     );
     if (notificationSettings == null) return;
     
     // 完了
-    await _nav.go(const HomeRoute());
+    await _nav.go(const Home());
     _nav.showSnackBar(message: 'セットアップが完了しました！');
   }
 }
 ```
 
+### カスタムトランジション
+
+```dart
+// lib/routes/app_routes.dart
+@TypedGoRoute<CustomTransitionRoute>(path: '/custom')
+class CustomTransitionRoute extends GoRouteData with _$CustomTransitionRoute {
+  const CustomTransitionRoute();
+  
+  @override
+  Page<void> buildPage(BuildContext context, GoRouterState state) {
+    return CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: const CustomPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+// 対応するAppRouteクラス
+class CustomTransition extends AppRoute {
+  const CustomTransition();
+  
+  @override
+  GoRouteData get routeData => const CustomTransitionRoute();
+}
+```
+
 ## テスト
+
+### NavigableRouteのモック作成
+
+```dart
+// test/mocks/mock_navigable_route.dart
+import 'package:mockito/mockito.dart';
+import 'package:your_app/core/navigation/navigable_route.dart';
+
+class MockNavigableRoute extends Mock implements NavigableRoute {}
+```
 
 ### NavigationServiceのモック作成
 
@@ -651,13 +1039,22 @@ class OnboardingFlowService {
 // test/mocks/mock_navigation_service.dart
 import 'package:mockito/mockito.dart';
 import 'package:your_app/services/navigation_service.dart';
+import 'package:your_app/core/navigation/navigable_route.dart';
 
 class MockNavigationService extends Mock implements NavigationService {
   @override
-  Future<bool> go<T extends GoRouteData>(T routeData) async {
+  Future<bool> go(NavigableRoute route) async {
     return super.noSuchMethod(
-      Invocation.method(#go, [routeData]),
+      Invocation.method(#go, [route]),
       returnValue: Future.value(true),
+    );
+  }
+  
+  @override
+  Future<T?> push<T extends Object?>(NavigableRoute route) async {
+    return super.noSuchMethod(
+      Invocation.method(#push, [route]),
+      returnValue: Future.value(null),
     );
   }
   
@@ -692,16 +1089,21 @@ import '../mocks/mock_navigation_service.dart';
 void main() {
   group('UserController', () {
     late MockNavigationService mockNav;
+    late MockAuthService mockAuth;
     late UserController controller;
     
     setUp(() {
       mockNav = MockNavigationService();
-      controller = UserController(mockNav);
+      mockAuth = MockAuthService();
+      controller = UserController(mockNav, mockAuth);
     });
     
     test('ログイン成功時にホーム画面に遷移する', () async {
       // Arrange
-      when(mockNav.go(const HomeRoute())).thenAnswer((_) async => true);
+      final user = User(id: '1', name: 'Test User');
+      when(mockAuth.login('test@example.com', 'password'))
+          .thenAnswer((_) async => user);
+      when(mockNav.go(any)).thenAnswer((_) async => true);
       when(mockNav.showSnackBar(message: anyNamed('message')))
           .thenAnswer((_) async => true);
       
@@ -709,12 +1111,15 @@ void main() {
       await controller.loginUser('test@example.com', 'password');
       
       // Assert
-      verify(mockNav.go(const HomeRoute())).called(1);
+      verify(mockNav.go(argThat(isA<HomeRoute>()))).called(1);
       verify(mockNav.showSnackBar(message: 'ログインしました')).called(1);
+      expect(controller.state.value, equals(user));
     });
     
     test('ログイン失敗時にエラーダイアログを表示する', () async {
       // Arrange
+      when(mockAuth.login('invalid@email.com', 'wrong_password'))
+          .thenThrow(Exception('Invalid credentials'));
       when(mockNav.showAlert(
         title: anyNamed('title'),
         message: anyNamed('message'),
@@ -728,7 +1133,35 @@ void main() {
         title: 'エラー',
         message: argThat(contains('ログインに失敗しました'), named: 'message'),
       )).called(1);
+      expect(controller.state.hasError, isTrue);
     });
+  });
+}
+```
+
+### ルートクラスのテスト
+
+```dart
+// test/routes/route_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:your_app/routes/app_routes.dart';
+import 'package:your_app/core/navigation/navigable_route.dart';
+
+void main() {
+  test('すべてのルートクラスがNavigableRouteを実装している', () {
+    // Assert
+    expect(const HomeRoute(), isA<NavigableRoute>());
+    expect(const ProfileRoute(), isA<NavigableRoute>());
+    expect(const DetailRoute(id: '123'), isA<NavigableRoute>());
+  });
+  
+  test('ルートパラメータが正しく設定される', () {
+    // Arrange
+    const route = DetailRoute(id: '123', tab: 'info');
+    
+    // Assert
+    expect(route.id, equals('123'));
+    expect(route.tab, equals('info'));
   });
 }
 ```
@@ -769,10 +1202,30 @@ class GoodExample extends ConsumerWidget {
 - **プロバイダーアクセス**: `ref.read(goRouterProvider)`は軽量で通常のアプリ使用では問題なし
 - **Context待機**: Hot Reload以外では即座にContextが取得でき、100ms待機はほとんど発生しない
 - **メモリ使用量**: NavigationServiceはステートレスで軽量
+- **型チェック**: NavigableRouteインターフェースによる型チェックは実行時のオーバーヘッドが最小限
 
 ## トラブルシューティング
 
 ### よくある問題と解決策
+
+#### NavigableRouteMixinの追加忘れ
+
+```dart
+// 問題: The method 'navigate' isn't defined for the type 'NewRoute'
+// 原因: NavigableRouteMixinを追加し忘れている
+
+// ❌ 間違い
+@TypedGoRoute<NewRoute>(path: '/new')
+class NewRoute extends GoRouteData {
+  // ...
+}
+
+// ✅ 正しい
+@TypedGoRoute<NewRoute>(path: '/new')
+class NewRoute extends GoRouteData with NavigableRouteMixin {
+  // ...
+}
+```
 
 #### Context取得失敗
 
@@ -793,11 +1246,11 @@ void debugNavigationIssue(WidgetRef ref) {
 }
 ```
 
-#### ルート未定義エラー
+#### ルート生成エラー
 
 ```bash
-# 問題: Route not found
-# 原因: go_router_builderの生成ファイルが古い
+# 問題: Route not found / 生成されたコードが見つからない
+# 原因: go_router_builderの生成ファイルが古いまたは存在しない
 # 解決: 以下のコマンドを実行
 
 dart run build_runner build --delete-conflicting-outputs
@@ -807,15 +1260,11 @@ dart run build_runner build --delete-conflicting-outputs
 
 ```dart
 // 問題: 型が合わない
-// 原因: GoRouteDataのパラメータ型不一致
-// 解決: ルート定義でパラメータ型を確認
+// 原因: NavigableRoute型を期待している場所でGoRouteDataを使用
+// 解決: すべてのルートクラスにNavigableRouteMixinを追加
 
-@TypedGoRoute<DetailRoute>(path: '/detail/:id')
-class DetailRoute extends GoRouteData {
-  final String id; // String型であることを確認
-  
-  const DetailRoute({required this.id});
-}
+// NavigationServiceメソッドの引数はNavigableRoute型
+Future<bool> go(NavigableRoute route)  // GoRouteDataではない
 ```
 
 #### Hot Reload後のナビゲーション失敗
@@ -838,6 +1287,17 @@ Navigator.pushNamed(context, '/profile');
 // After: NavigationService
 final nav = ref.read(navigationServiceProvider);
 nav.go(const ProfileRoute());
+```
+
+### 既存のGoRouterからの移行
+
+```dart
+// Before: GoRouterを直接使用
+context.go('/detail/123?tab=info');
+
+// After: 型安全なNavigationService
+final nav = ref.read(navigationServiceProvider);
+nav.go(const DetailRoute(id: '123', tab: 'info'));
 ```
 
 ### 既存のshowDialogからの移行
@@ -873,12 +1333,38 @@ final confirmed = await nav.showConfirmDialog(
 
 ### 段階的移行のアプローチ
 
-1. **Phase 1**: NavigationServiceを導入し、新機能から使用開始
-2. **Phase 2**: 既存の画面遷移を段階的にNavigationServiceに置き換え
-3. **Phase 3**: すべての Navigator.pushNamed を削除
-4. **Phase 4**: go_router_builderによる型安全なルート定義に移行
+1. **Phase 1**: NavigableRouteとNavigationServiceを導入
+   - core/navigationディレクトリを作成
+   - NavigableRouteインターフェースとMixinを追加
+   - NavigationServiceを実装
+
+2. **Phase 2**: 既存のルートクラスを更新
+   - すべてのGoRouteDataサブクラスに`with NavigableRouteMixin`を追加
+   - build_runnerを実行して生成コードを更新
+
+3. **Phase 3**: 画面遷移を段階的に置き換え
+   - 新機能からNavigationServiceを使用開始
+   - 既存の画面遷移を段階的にNavigationServiceに置き換え
+
+4. **Phase 4**: 完全移行
+   - すべての直接的なGoRouter使用を削除
+   - Navigator.pushNamedなどの古いAPIを削除
 
 ## API リファレンス
+
+### NavigableRoute
+
+```dart
+abstract interface class NavigableRoute {
+  void navigate(BuildContext context);
+  Future<T?> navigatePush<T extends Object?>(BuildContext context);
+  Future<T?> navigatePushReplacement<T extends Object?>(
+    BuildContext context, 
+    [Object? result]
+  );
+  void navigateReplace(BuildContext context);
+}
+```
 
 ### NavigationService
 
@@ -886,9 +1372,10 @@ final confirmed = await nav.showConfirmDialog(
 
 | メソッド | 戻り値 | 説明 |
 |---------|--------|------|
-| `go<T>(T routeData)` | `Future<bool>` | 画面遷移（スタック置き換え） |
-| `push<T, R>(R routeData)` | `Future<T?>` | 画面プッシュ（スタック追加） |
-| `pushReplacement<T, R>(R routeData, {Object? result})` | `Future<T?>` | 画面置き換え |
+| `go(NavigableRoute route)` | `Future<bool>` | 画面遷移（スタック置き換え） |
+| `push<T>(NavigableRoute route)` | `Future<T?>` | 画面プッシュ（スタック追加） |
+| `pushReplacement<T>(NavigableRoute route, {Object? result})` | `Future<T?>` | 画面置き換え |
+| `replace(NavigableRoute route)` | `Future<bool>` | 画面置き換え（アニメーションなし） |
 | `pop<T>([T? result])` | `bool` | 現在画面をポップ |
 | `canPop()` | `bool` | ポップ可能かチェック |
 
@@ -908,14 +1395,29 @@ final confirmed = await nav.showConfirmDialog(
 - **nullable型**: 実際の戻り値=成功, `null`=失敗・キャンセル・Context無効
 - **bool?型（確認ダイアログ）**: `true`=確認, `false`=キャンセル, `null`=失敗・Context無効
 
-### GoRouteData 拡張
+### ルートクラスの実装要件
 
-すべてのルートクラスは `GoRouteData` を継承し、以下のメソッドが使用可能：
+すべてのルートクラスは以下の要件を満たす必要があります：
 
-- `go(BuildContext context)`: 画面遷移
-- `push<T>(BuildContext context)`: 画面プッシュ
-- `pushReplacement<T>(BuildContext context, [Object? result])`: 画面置き換え
+1. `GoRouteData`を継承
+2. `NavigableRouteMixin`を使用
+3. `@TypedGoRoute`アノテーションを付与
+4. `build`または`buildPage`メソッドを実装
+
+```dart
+@TypedGoRoute<ExampleRoute>(path: '/example/:id')
+class ExampleRoute extends GoRouteData with NavigableRouteMixin {
+  final String id;
+  
+  const ExampleRoute({required this.id});
+  
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return ExamplePage(id: id);
+  }
+}
+```
 
 ---
 
-このナビゲーションシステムを使用することで、Flutterアプリケーションの画面遷移を型安全で保守しやすい形で統一管理できます。プロジェクトの規模に応じて段階的に導入し、開発効率と品質の向上を実現してください。
+このナビゲーションシステムを使用することで、Flutterアプリケーションの画面遷移を型安全で保守しやすい形で統一管理できます。NavigableRouteインターフェースとNavigableRouteMixinの組み合わせにより、go_router_builderの型安全性を活かしながら、分岐処理なしで統一的なナビゲーションAPIを提供します。
