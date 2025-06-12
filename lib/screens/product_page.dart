@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/navigation_service.dart';
+import '../providers/router_provider.dart';
 import '../models/product_model.dart';
 
 class ProductPage extends ConsumerWidget {
@@ -35,7 +35,7 @@ class ProductPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
-            onPressed: () => nav.showSnackBar(message: 'Share feature coming soon!'),
+            onPressed: () => nav.showSnackBar('Share feature coming soon!'),
           ),
         ],
       ),
@@ -118,15 +118,15 @@ class ProductPage extends ConsumerWidget {
                           final confirmed = await nav.showConfirmDialog(
                             title: 'Add to Cart',
                             message: 'Add ${product.name} to your cart?',
-                            confirmText: 'Add',
+                            confirmButtonText: 'Add',
                           );
                           
                           if (confirmed == true) {
                             nav.showSnackBar(
-                              message: 'Added to cart!',
+                              'Added to cart!',
                               action: SnackBarAction(
                                 label: 'View Cart',
-                                onPressed: () => nav.showSnackBar(message: 'Cart feature coming soon!'),
+                                onPressed: () => nav.showSnackBar('Cart feature coming soon!'),
                               ),
                             );
                             

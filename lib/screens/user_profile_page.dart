@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/navigation_service.dart';
+import '../providers/router_provider.dart';
 
 class UserProfilePage extends ConsumerWidget {
   final String userId;
@@ -56,11 +56,11 @@ class UserProfilePage extends ConsumerWidget {
                 final confirmed = await nav.showConfirmDialog(
                   title: 'Edit Profile',
                   message: 'Would you like to edit this profile?',
-                  confirmText: 'Edit',
+                  confirmButtonText: 'Edit',
                 );
                 
                 if (confirmed == true) {
-                  nav.showSnackBar(message: 'Edit feature coming soon!');
+                  nav.showSnackBar('Edit feature coming soon!');
                 }
               },
               child: const Text('Edit Profile'),

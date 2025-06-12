@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/navigation_service.dart';
+import '../providers/router_provider.dart';
 
 class PostDetailPage extends ConsumerWidget {
   final String userId;
@@ -26,8 +26,8 @@ class PostDetailPage extends ConsumerWidget {
           IconButton(
             icon: Icon(showComments ? Icons.comment : Icons.comment_outlined),
             onPressed: () async {
-              await nav.showSnackBar(
-                message: showComments 
+              nav.showSnackBar(
+                showComments 
                   ? 'Comments are already visible'
                   : 'Toggle comments feature',
               );
@@ -89,17 +89,17 @@ class PostDetailPage extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 TextButton.icon(
-                  onPressed: () => nav.showSnackBar(message: 'Liked!'),
+                  onPressed: () => nav.showSnackBar('Liked!'),
                   icon: const Icon(Icons.thumb_up_outlined),
                   label: const Text('Like'),
                 ),
                 TextButton.icon(
-                  onPressed: () => nav.showSnackBar(message: 'Shared!'),
+                  onPressed: () => nav.showSnackBar('Shared!'),
                   icon: const Icon(Icons.share),
                   label: const Text('Share'),
                 ),
                 TextButton.icon(
-                  onPressed: () => nav.showSnackBar(message: 'Saved!'),
+                  onPressed: () => nav.showSnackBar('Saved!'),
                   icon: const Icon(Icons.bookmark_outline),
                   label: const Text('Save'),
                 ),

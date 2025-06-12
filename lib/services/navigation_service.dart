@@ -1,213 +1,173 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-import '../providers/router_provider.dart';
-import '../routes/app_route.dart';
+import '../routes/app_routes.dart';
 
 class NavigationService {
-  final Ref ref;
-
-  NavigationService(this.ref);
-
-  GoRouter get _router => ref.read(goRouterProvider);
-  BuildContext? get _context =>
-      _router.routerDelegate.navigatorKey.currentContext;
-
-  /// 画面遷移（go）
-  Future<bool> go(AppRoute route) async {
-    final context = _context;
-    if (context == null || !context.mounted) return false;
-
-    try {
-      switch (route) {
-        case Home():
-          route.routeData.go(context);
-        case Profile():
-          (route.routeData).go(context);
-        case Settings():
-          (route.routeData).go(context);
-        case User():
-          (route.routeData).go(context);
-        case UserProfile():
-          (route.routeData).go(context);
-        case UserPosts():
-          (route.routeData).go(context);
-        case PostDetail():
-          (route.routeData).go(context);
-        case Product():
-          (route.routeData).go(context);
-        case Checkout():
-          (route.routeData).go(context);
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Navigation error: $e');
-      return false;
+  final GoRouter _router;
+  
+  NavigationService(this._router);
+  
+  void go(AppRoute route) {
+    _router.go(route.buildPath(), extra: route.extra);
+  }
+  
+  Future<T?> push<T>(AppRoute route) {
+    return _router.push<T>(route.buildPath(), extra: route.extra);
+  }
+  
+  void pushReplacement(AppRoute route) {
+    _router.pushReplacement(route.buildPath(), extra: route.extra);
+  }
+  
+  bool canPop() {
+    return _router.canPop();
+  }
+  
+  void pop<T>([T? result]) {
+    if (canPop()) {
+      _router.pop(result);
     }
   }
-
-  /// 画面プッシュ
-  Future<T?> push<T extends Object?>(AppRoute route) async {
-    final context = _context;
-    if (context == null || !context.mounted) return null;
-
-    try {
-      return switch (route) {
-        Home() => route.routeData.push<T>(context),
-        Profile() => route.routeData.push<T>(context),
-        Settings() => route.routeData.push<T>(context),
-        User() => route.routeData.push<T>(context),
-        UserProfile() => route.routeData.push<T>(context),
-        UserPosts() => route.routeData.push<T>(context),
-        PostDetail() => route.routeData.push<T>(context),
-        Product() => route.routeData.push<T>(context),
-        Checkout() => route.routeData.push<T>(context),
-      };
-    } catch (e) {
-      debugPrint('Push error: $e');
-      return null;
-    }
+  
+  void pushAndRemoveUntil(AppRoute route, bool Function(GoRoute) predicate) {
+    _router.pushReplacement(route.buildPath(), extra: route.extra);
   }
-
-  /// 画面置き換え
-  Future<void> pushReplacement(AppRoute route) async {
-    final context = _context;
-    if (context == null || !context.mounted) return;
-
-    try {
-      switch (route) {
-        case Home():
-          (route.routeData).pushReplacement(context);
-        case Profile():
-          (route.routeData).pushReplacement(context);
-        case Settings():
-          (route.routeData).pushReplacement(context);
-        case User():
-          (route.routeData).pushReplacement(context);
-        case UserProfile():
-          (route.routeData).pushReplacement(context);
-        case UserPosts():
-          (route.routeData).pushReplacement(context);
-        case PostDetail():
-          (route.routeData).pushReplacement(context);
-        case Product():
-          (route.routeData).pushReplacement(context);
-        case Checkout():
-          (route.routeData).pushReplacement(context);
-      }
-    } catch (e) {
-      debugPrint('Push replacement error: $e');
-    }
-  }
-
-  /// 戻る
-  bool pop<T>([T? result]) {
-    if (_router.canPop()) {
-      _context?.pop(result);
-      return true;
-    }
-    return false;
-  }
-
-  /// 戻れるかチェック
-  bool canPop() => _router.canPop();
-
-  // === ダイアログ・モーダル系メソッド ===
-
+  
   Future<T?> showDialogWidget<T>({
-    required Widget dialog,
+    required Widget child,
     bool barrierDismissible = true,
-  }) async {
-    final context = _context;
-    if (context == null || !context.mounted) return null;
-
+    Color? barrierColor,
+    String? barrierLabel,
+    bool useSafeArea = true,
+    bool useRootNavigator = false,
+    RouteSettings? routeSettings,
+    Offset? anchorPoint,
+    TraversalEdgeBehavior? traversalEdgeBehavior,
+  }) {
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null) {
+      throw Exception('No context available for showDialog');
+    }
+    
     return showDialog<T>(
       context: context,
+      builder: (_) => child,
       barrierDismissible: barrierDismissible,
-      builder: (_) => dialog,
+      barrierColor: barrierColor,
+      barrierLabel: barrierLabel,
+      useSafeArea: useSafeArea,
+      useRootNavigator: useRootNavigator,
+      routeSettings: routeSettings,
+      anchorPoint: anchorPoint,
+      traversalEdgeBehavior: traversalEdgeBehavior,
     );
   }
-
-  Future<bool> showAlert({
+  
+  Future<void> showAlert({
     required String title,
-    required String message,
-    String buttonText = 'OK',
-  }) async {
-    final result = await showDialogWidget<bool>(
-      dialog: AlertDialog(
+    String? message,
+    String okButtonText = 'OK',
+  }) {
+    return showDialogWidget(
+      child: AlertDialog(
         title: Text(title),
-        content: Text(message),
+        content: message != null ? Text(message) : null,
         actions: [
           TextButton(
-            onPressed: () => pop(true),
-            child: Text(buttonText),
+            onPressed: () => pop(),
+            child: Text(okButtonText),
           ),
         ],
       ),
     );
-    return result ?? false;
   }
-
+  
   Future<bool?> showConfirmDialog({
     required String title,
-    required String message,
-    String confirmText = '確認',
-    String cancelText = 'キャンセル',
-  }) async {
+    String? message,
+    String confirmButtonText = 'Confirm',
+    String cancelButtonText = 'Cancel',
+    bool barrierDismissible = true,
+  }) {
     return showDialogWidget<bool>(
-      dialog: AlertDialog(
+      barrierDismissible: barrierDismissible,
+      child: AlertDialog(
         title: Text(title),
-        content: Text(message),
+        content: message != null ? Text(message) : null,
         actions: [
           TextButton(
             onPressed: () => pop(false),
-            child: Text(cancelText),
+            child: Text(cancelButtonText),
           ),
           TextButton(
             onPressed: () => pop(true),
-            child: Text(confirmText),
+            child: Text(confirmButtonText),
           ),
         ],
       ),
     );
   }
-
-  Future<bool> showSnackBar({
-    required String message,
-    Duration? duration,
+  
+  void showSnackBar(
+    String message, {
+    Duration duration = const Duration(seconds: 4),
     SnackBarAction? action,
-  }) async {
-    final context = _context;
-    if (context == null || !context.mounted) return false;
-
+  }) {
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null) {
+      throw Exception('No context available for showSnackBar');
+    }
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        duration: duration ?? const Duration(seconds: 3),
+        duration: duration,
         action: action,
       ),
     );
-    return true;
   }
-
+  
   Future<T?> showBottomSheet<T>({
-    required Widget sheet,
+    required Widget Function(BuildContext) builder,
+    Color? backgroundColor,
+    double? elevation,
+    ShapeBorder? shape,
+    Clip? clipBehavior,
+    BoxConstraints? constraints,
+    Color? barrierColor,
+    bool isScrollControlled = false,
+    bool useRootNavigator = false,
     bool isDismissible = true,
     bool enableDrag = true,
-  }) async {
-    final context = _context;
-    if (context == null || !context.mounted) return null;
+    bool showDragHandle = false,
+    bool useSafeArea = false,
+    RouteSettings? routeSettings,
+    AnimationController? transitionAnimationController,
+    Offset? anchorPoint,
+  }) {
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    if (context == null) {
+      throw Exception('No context available for showBottomSheet');
+    }
     
     return showModalBottomSheet<T>(
       context: context,
+      builder: builder,
+      backgroundColor: backgroundColor,
+      elevation: elevation,
+      shape: shape,
+      clipBehavior: clipBehavior,
+      constraints: constraints,
+      barrierColor: barrierColor,
+      isScrollControlled: isScrollControlled,
+      useRootNavigator: useRootNavigator,
       isDismissible: isDismissible,
       enableDrag: enableDrag,
-      builder: (_) => sheet,
+      showDragHandle: showDragHandle,
+      useSafeArea: useSafeArea,
+      routeSettings: routeSettings,
+      transitionAnimationController: transitionAnimationController,
+      anchorPoint: anchorPoint,
     );
   }
 }
-
-final navigationServiceProvider = Provider<NavigationService>((ref) {
-  return NavigationService(ref);
-});

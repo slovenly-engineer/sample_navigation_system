@@ -116,7 +116,7 @@ class _DetailPageState extends ConsumerState<DetailPage>
                     ElevatedButton.icon(
                       onPressed: () async {
                         final action = await nav.showBottomSheet<String>(
-                          sheet: Container(
+                          builder: (context) => Container(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -150,9 +150,7 @@ class _DetailPageState extends ConsumerState<DetailPage>
                         );
                         
                         if (action != null) {
-                          await nav.showSnackBar(
-                            message: '$actionを実行しました',
-                          );
+                          nav.showSnackBar('$actionを実行しました');
                         }
                       },
                       icon: const Icon(Icons.more_horiz),
@@ -188,9 +186,7 @@ class _DetailPageState extends ConsumerState<DetailPage>
                   trailing: IconButton(
                     icon: const Icon(Icons.reply),
                     onPressed: () {
-                      nav.showSnackBar(
-                        message: 'コメント ${index + 1}に返信',
-                      );
+                      nav.showSnackBar('コメント ${index + 1}に返信');
                     },
                   ),
                 ),
@@ -202,7 +198,7 @@ class _DetailPageState extends ConsumerState<DetailPage>
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await nav.showDialogWidget<bool>(
-            dialog: AlertDialog(
+            child: AlertDialog(
               title: const Text('確認'),
               content: const Text('この画面を閉じますか？'),
               actions: [

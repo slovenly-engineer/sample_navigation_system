@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/navigation_service.dart';
-import '../routes/app_route.dart';
+import '../providers/router_provider.dart';
+import '../routes/app_routes.dart';
 
 class UserPostsPage extends ConsumerWidget {
   final String userId;
@@ -51,10 +51,9 @@ class UserPostsPage extends ConsumerWidget {
               isThreeLine: true,
               trailing: const Icon(Icons.arrow_forward_ios),
               onTap: () {
-                nav.go(PostDetail(
+                nav.go(PostDetailRoute(
                   userId: userId,
                   postId: post['id']!,
-                  showComments: false,
                 ));
               },
             ),

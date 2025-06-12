@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/settings_data.dart';
-import '../services/navigation_service.dart';
+import '../providers/router_provider.dart';
+import '../routes/app_routes.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   final SettingsData? initialData;
@@ -30,12 +31,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       appBar: AppBar(
         title: const Text('設定'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // 階層ナビゲーションではホームに戻る
+            nav.go(HomeRoute());
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: () async {
               final confirmed = await nav.showDialogWidget<bool>(
-                dialog: AlertDialog(
+                child: AlertDialog(
                   title: const Text('設定の保存'),
                   content: const Text('現在の設定を保存しますか？'),
                   actions: [
@@ -52,9 +60,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               );
               
               if (confirmed == true) {
-                nav.showSnackBar(
-                  message: '設定を保存しました',
-                );
+                nav.showSnackBar('設定を保存しました');
                 nav.pop(_settings);
               }
             },
@@ -167,9 +173,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _settings.notificationsEnabled
                         ? () {
-                            nav.showSnackBar(
-                              message: '通知音の設定',
-                            );
+                            nav.showSnackBar('通知音の設定');
                           }
                         : null,
                   ),
@@ -181,9 +185,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _settings.notificationsEnabled
                         ? () {
-                            nav.showSnackBar(
-                              message: 'バイブレーションの設定',
-                            );
+                            nav.showSnackBar('バイブレーションの設定');
                           }
                         : null,
                   ),
@@ -201,7 +203,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   OutlinedButton.icon(
                     onPressed: () async {
                       final confirmed = await nav.showDialogWidget<bool>(
-                        dialog: AlertDialog(
+                        child: AlertDialog(
                           title: const Text('リセット確認'),
                           content: const Text('すべての設定をデフォルトに戻しますか？'),
                           actions: [
@@ -221,9 +223,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         setState(() {
                           _settings = const SettingsData();
                         });
-                        nav.showSnackBar(
-                          message: '設定をリセットしました',
-                        );
+                        nav.showSnackBar('設定をリセットしました');
                       }
                     },
                     icon: const Icon(Icons.restore),
@@ -233,7 +233,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ElevatedButton.icon(
                     onPressed: () {
                       nav.showDialogWidget(
-                        dialog: AlertDialog(
+                        child: AlertDialog(
                           title: const Text('現在の設定'),
                           content: Text(
                             'ダークモード: ${_settings.darkMode}\n'
@@ -278,7 +278,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final nav = ref.read(navigationServiceProvider);
     
     return await nav.showDialogWidget<String>(
-      dialog: AlertDialog(
+      child: AlertDialog(
         title: const Text('言語を選択'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
