@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../routes/app_route.dart';
+import '../routes/app_routes.dart';
 import '../providers/router_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -17,11 +17,8 @@ class ProfilePage extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            if (nav.canPop()) {
-              nav.pop();
-            } else {
-              nav.go(const Home());
-            }
+            // 階層ナビゲーションではホームに戻る
+            nav.go(HomeRoute());
           },
         ),
       ),
@@ -68,9 +65,7 @@ class ProfilePage extends ConsumerWidget {
                       trailing: IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () {
-                          nav.showSnackBar(
-                            message: 'メールアドレスの編集',
-                          );
+                          nav.showSnackBar('メールアドレスの編集');
                         },
                       ),
                     ),
@@ -82,9 +77,7 @@ class ProfilePage extends ConsumerWidget {
                       trailing: IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () {
-                          nav.showSnackBar(
-                            message: '電話番号の編集',
-                          );
+                          nav.showSnackBar('電話番号の編集');
                         },
                       ),
                     ),
@@ -96,9 +89,7 @@ class ProfilePage extends ConsumerWidget {
                       trailing: IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: () {
-                          nav.showSnackBar(
-                            message: '住所の編集',
-                          );
+                          nav.showSnackBar('住所の編集');
                         },
                       ),
                     ),
@@ -110,12 +101,12 @@ class ProfilePage extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => nav.go(const Home()),
+                    onPressed: () => nav.go(HomeRoute()),
                     icon: const Icon(Icons.home),
                     label: const Text('ホームへ'),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () => nav.push(const Settings()),
+                    onPressed: () => nav.push(SettingsRoute()),
                     icon: const Icon(Icons.settings),
                     label: const Text('設定'),
                   ),
@@ -125,7 +116,7 @@ class ProfilePage extends ConsumerWidget {
               TextButton.icon(
                 onPressed: () async {
                   final confirmed = await nav.showDialogWidget<bool>(
-                    dialog: AlertDialog(
+                    child: AlertDialog(
                       title: const Text('ログアウト'),
                       content: const Text('ログアウトしますか？'),
                       actions: [
@@ -142,10 +133,8 @@ class ProfilePage extends ConsumerWidget {
                   );
 
                   if (confirmed == true && context.mounted) {
-                    nav.showSnackBar(
-                      message: 'ログアウトしました',
-                    );
-                    nav.go(const Home());
+                    nav.showSnackBar('ログアウトしました');
+                    nav.go(HomeRoute());
                   }
                 },
                 icon: const Icon(Icons.logout, color: Colors.red),

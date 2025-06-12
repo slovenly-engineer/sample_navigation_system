@@ -1,152 +1,131 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-
-import '../models/cart_item.dart';
-import '../models/payment_method.dart';
-import '../models/product_model.dart';
-import '../models/settings_data.dart';
-import '../models/shipping_address.dart';
-import '../screens/checkout_page.dart';
-import '../screens/home_page.dart';
-import '../screens/post_detail_page.dart';
-import '../screens/product_page.dart';
-import '../screens/profile_page.dart';
-import '../screens/settings_page.dart';
-import '../screens/user_page.dart';
-import '../screens/user_posts_page.dart';
-import '../screens/user_profile_page.dart';
-
-part 'app_routes.g.dart';
-
-@TypedGoRoute<HomeRoute>(path: '/')
-class HomeRoute extends GoRouteData with _$HomeRoute {
-  const HomeRoute();
-
-  @override
-  Widget build(BuildContext context, GoRouterState state) => const HomePage();
+abstract class AppRoute {
+  String get path;
+  Map<String, String> get pathParameters => {};
+  Map<String, String> get queryParameters => {};
+  Object? get extra => null;
+  
+  String buildPath() {
+    var path = this.path;
+    pathParameters.forEach((key, value) {
+      path = path.replaceAll(':$key', value);
+    });
+    
+    if (queryParameters.isNotEmpty) {
+      final queryString = queryParameters.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      path = '$path?$queryString';
+    }
+    
+    return path;
+  }
 }
 
-@TypedGoRoute<ProfileRoute>(path: '/profile')
-class ProfileRoute extends GoRouteData with _$ProfileRoute {
-  const ProfileRoute();
-
+class HomeRoute extends AppRoute {
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      const ProfilePage();
+  String get path => '/';
 }
 
-@TypedGoRoute<SettingsRoute>(path: '/settings')
-class SettingsRoute extends GoRouteData with _$SettingsRoute {
-  final String? tab;
-
-  const SettingsRoute({this.tab});
-
+class ProfileRoute extends AppRoute {
   @override
-  Widget build(BuildContext context, GoRouterState state) => SettingsPage(
-      initialTab: tab != null ? SettingsTab.values.byName(tab!) : null);
+  String get path => '/profile';
 }
 
-@TypedGoRoute<UserRoute>(
-  path: '/user/:userId',
-  routes: [
-    TypedGoRoute<UserProfileRoute>(path: 'profile'),
-    TypedGoRoute<UserPostsRoute>(
-      path: 'posts',
-      routes: [
-        TypedGoRoute<PostDetailRoute>(path: ':postId'),
-      ],
-    ),
-  ],
-)
-class UserRoute extends GoRouteData with _$UserRoute {
+class SettingsRoute extends AppRoute {
+  final int? initialTab;
+  
+  SettingsRoute({this.initialTab});
+  
+  @override
+  String get path => '/settings';
+  
+  @override
+  Map<String, String> get queryParameters => 
+    initialTab != null ? {'tab': initialTab.toString()} : {};
+}
+
+class UserRoute extends AppRoute {
   final String userId;
-
-  const UserRoute({required this.userId});
-
+  
+  UserRoute({required this.userId});
+  
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      UserPage(userId: userId);
+  String get path => '/user/:userId';
+  
+  @override
+  Map<String, String> get pathParameters => {'userId': userId};
 }
 
-class UserProfileRoute extends GoRouteData with _$UserProfileRoute {
+class UserProfileRoute extends AppRoute {
   final String userId;
-
-  const UserProfileRoute({required this.userId});
-
+  
+  UserProfileRoute({required this.userId});
+  
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      UserProfilePage(userId: userId);
+  String get path => '/user/:userId/profile';
+  
+  @override
+  Map<String, String> get pathParameters => {'userId': userId};
 }
 
-class UserPostsRoute extends GoRouteData with _$UserPostsRoute {
+class UserPostsRoute extends AppRoute {
   final String userId;
-
-  const UserPostsRoute({required this.userId});
-
+  
+  UserPostsRoute({required this.userId});
+  
   @override
-  Widget build(BuildContext context, GoRouterState state) =>
-      UserPostsPage(userId: userId);
+  String get path => '/user/:userId/posts';
+  
+  @override
+  Map<String, String> get pathParameters => {'userId': userId};
 }
 
-class PostDetailRoute extends GoRouteData with _$PostDetailRoute {
+class PostDetailRoute extends AppRoute {
   final String userId;
   final String postId;
-  final bool showComments;
-
-  const PostDetailRoute({
-    required this.userId,
-    required this.postId,
-    this.showComments = false,
-  });
-
+  
+  PostDetailRoute({required this.userId, required this.postId});
+  
   @override
-  Widget build(BuildContext context, GoRouterState state) => PostDetailPage(
-        userId: userId,
-        postId: postId,
-        showComments: showComments,
-      );
+  String get path => '/user/:userId/posts/:postId';
+  
+  @override
+  Map<String, String> get pathParameters => {
+    'userId': userId,
+    'postId': postId,
+  };
 }
 
-@TypedGoRoute<ProductRoute>(path: '/product/:productId')
-class ProductRoute extends GoRouteData with _$ProductRoute {
+class ProductRoute extends AppRoute {
   final String productId;
-  final ProductModel? $extra;
-
-  const ProductRoute({
-    required this.productId,
-    this.$extra,
-  });
-
+  
+  ProductRoute({required this.productId});
+  
   @override
-  Widget build(BuildContext context, GoRouterState state) => ProductPage(
-        productId: productId,
-        initialData: $extra,
-      );
+  String get path => '/product/:productId';
+  
+  @override
+  Map<String, String> get pathParameters => {'productId': productId};
 }
 
-@TypedGoRoute<CheckoutRoute>(path: '/checkout')
-class CheckoutRoute extends GoRouteData with _$CheckoutRoute {
-  final CheckoutData $extra;
-
-  const CheckoutRoute({required this.$extra});
-
-  @override
-  Widget build(BuildContext context, GoRouterState state) => CheckoutPage(
-        items: $extra.items,
-        address: $extra.address,
-        paymentMethod: $extra.paymentMethod,
-      );
-}
-
-// Extra data wrapper
-class CheckoutData {
-  final List<CartItem> items;
-  final ShippingAddress address;
-  final PaymentMethod paymentMethod;
-
-  const CheckoutData({
+class CheckoutRoute extends AppRoute {
+  final List<dynamic> items;
+  final dynamic address;
+  final dynamic paymentMethod;
+  
+  CheckoutRoute({
     required this.items,
     required this.address,
     required this.paymentMethod,
   });
+  
+  @override
+  String get path => '/checkout';
+  
+  @override
+  Object get extra => {
+    'items': items,
+    'address': address,
+    'paymentMethod': paymentMethod,
+  };
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/navigation_service.dart';
-import '../routes/app_route.dart';
+import '../providers/router_provider.dart';
+import '../routes/app_routes.dart';
 
 class UserPage extends ConsumerWidget {
   final String userId;
@@ -16,6 +16,13 @@ class UserPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text('User $userId'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // 階層ナビゲーションではホームに戻る
+            nav.go(HomeRoute());
+          },
+        ),
       ),
       body: Center(
         child: Column(
@@ -27,13 +34,13 @@ class UserPage extends ConsumerWidget {
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () => nav.go(UserProfile(userId: userId)),
+              onPressed: () => nav.go(UserProfileRoute(userId: userId)),
               icon: const Icon(Icons.person),
               label: const Text('View Profile'),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () => nav.go(UserPosts(userId: userId)),
+              onPressed: () => nav.go(UserPostsRoute(userId: userId)),
               icon: const Icon(Icons.article),
               label: const Text('View Posts'),
             ),

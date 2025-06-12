@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/navigation_service.dart';
+import '../providers/router_provider.dart';
 import '../models/cart_item.dart';
 import '../models/shipping_address.dart';
 import '../models/payment_method.dart';
-import '../routes/app_route.dart';
+import '../routes/app_routes.dart';
 
 class CheckoutPage extends ConsumerWidget {
   final List<CartItem> items;
@@ -102,7 +102,7 @@ class CheckoutPage extends ConsumerWidget {
                         ),
                         TextButton(
                           onPressed: () => nav.showSnackBar(
-                            message: 'Change address feature coming soon!',
+                            'Change address feature coming soon!',
                           ),
                           child: const Text('Change'),
                         ),
@@ -134,7 +134,7 @@ class CheckoutPage extends ConsumerWidget {
                         ),
                         TextButton(
                           onPressed: () => nav.showSnackBar(
-                            message: 'Change payment method feature coming soon!',
+                            'Change payment method feature coming soon!',
                           ),
                           child: const Text('Change'),
                         ),
@@ -166,7 +166,7 @@ class CheckoutPage extends ConsumerWidget {
                     final confirmed = await nav.showConfirmDialog(
                       title: 'Confirm Order',
                       message: 'Place order for \$${total.toStringAsFixed(2)}?',
-                      confirmText: 'Place Order',
+                      confirmButtonText: 'Place Order',
                     );
 
                     if (confirmed == true) {
@@ -174,11 +174,11 @@ class CheckoutPage extends ConsumerWidget {
                         title: 'Order Placed!',
                         message: 'Your order has been successfully placed. '
                             'Order number: #${DateTime.now().millisecondsSinceEpoch}',
-                        buttonText: 'OK',
+                        okButtonText: 'OK',
                       );
                       
                       // Navigate back to home
-                      nav.go(const Home());
+                      nav.go(HomeRoute());
                     }
                   },
                   style: ElevatedButton.styleFrom(

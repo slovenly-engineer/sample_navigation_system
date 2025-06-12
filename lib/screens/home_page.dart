@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/router_provider.dart';
-import '../routes/app_route.dart';
+import '../routes/app_routes.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -43,35 +43,46 @@ class HomePage extends ConsumerWidget {
               ),
               const SizedBox(height: 48),
 
-              // 基本的なナビゲーション
+              // メイン画面ナビゲーション（階層遷移）
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => nav.go(const Profile()),
+                  onPressed: () => nav.go(ProfileRoute()),
                   icon: const Icon(Icons.person),
                   label: const Text('プロフィールへ'),
                 ),
               ),
               const SizedBox(height: 12),
 
-              // パラメータ付きナビゲーション
+              // パラメータ付きナビゲーション（階層遷移）
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => nav.go(const User(userId: '123')),
+                  onPressed: () => nav.go(UserRoute(userId: '123')),
                   icon: const Icon(Icons.info),
-                  label: const Text('詳細画面へ'),
+                  label: const Text('ユーザー詳細へ'),
                 ),
               ),
               const SizedBox(height: 12),
 
-              // プッシュナビゲーション
+              // 設定画面（階層遷移）
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => nav.push(const Profile()),
+                  onPressed: () => nav.go(SettingsRoute()),
+                  icon: const Icon(Icons.settings),
+                  label: const Text('設定へ'),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // モーダル的なナビゲーション（プッシュ）
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => nav.push(ProfileRoute()),
                   icon: const Icon(Icons.add),
-                  label: const Text('プロフィールをプッシュ'),
+                  label: const Text('プロフィール（モーダル）'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -82,10 +93,10 @@ class HomePage extends ConsumerWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     final result = await nav.push<String>(
-                      const Profile()
+                      ProductRoute(productId: 'sample-123')
                     );
                     if (result != null) {
-                      nav.showSnackBar(message: '結果: $result');
+                      nav.showSnackBar('結果: $result');
                     }
                   },
                   icon: const Icon(Icons.input),
@@ -104,7 +115,7 @@ class HomePage extends ConsumerWidget {
                       await nav.showAlert(
                         title: 'お知らせ',
                         message: 'README.md仕様通りの実装が完了しました！',
-                        buttonText: '了解',
+                        okButtonText: '了解',
                       );
                     },
                     child: const Text('アラート'),
@@ -119,7 +130,7 @@ class HomePage extends ConsumerWidget {
                       );
                       
                       if (confirmed == true) {
-                        nav.showSnackBar(message: '実行しました');
+                        nav.showSnackBar('実行しました');
                       }
                     },
                     child: const Text('確認'),
@@ -132,7 +143,7 @@ class HomePage extends ConsumerWidget {
               ElevatedButton.icon(
                 onPressed: () async {
                   final result = await nav.showBottomSheet<String>(
-                    sheet: Container(
+                    builder: (context) => Container(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -169,7 +180,7 @@ class HomePage extends ConsumerWidget {
                   );
 
                   if (result != null) {
-                    nav.showSnackBar(message: '選択: $result');
+                    nav.showSnackBar('選択: $result');
                   }
                 },
                 icon: const Icon(Icons.more_vert),
